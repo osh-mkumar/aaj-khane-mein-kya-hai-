@@ -137,6 +137,7 @@ export type VoiceInterpretRequest = z.infer<typeof voiceInterpretRequestSchema>;
 
 export const voiceConfirmRequestSchema = z
   .object({
+    householdId: z.string().optional(),
     transcript: z.string().optional(),
     idempotencyKey: z.string().trim().min(1, "idempotencyKey is required"),
     expectedStateVersion: z.number().int().nonnegative().optional(),

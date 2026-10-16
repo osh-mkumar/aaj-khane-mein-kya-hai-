@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import Link from "next/link";
 import {
   CookingPot,
@@ -26,6 +26,13 @@ import { api, Badge, Loading, ErrorBox } from "../ui/shared";
 import { ActionPreview } from "../voice/ActionPreview";
 import { VoiceInput } from "../voice/VoiceInput";
 import type { InterpretationResult } from "@/lib/validation/voice";
+import { normalizeIngredient } from "@/lib/recipes/aliases";
+
+export interface MealIngredientItem {
+  ingredientId: string;
+  name: string;
+  quantityText: string;
+}
 
 export function CookDashboard() {
   const [household, setHousehold] = useState<Household>();
@@ -36,9 +43,16 @@ export function CookDashboard() {
   const [ttsLanguage, setTtsLanguage] = useState<"hi-IN" | "en-IN" | "mr-IN">("hi-IN");
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [cookingProgress, setCookingProgress] = useState<"NOT_STARTED" | "IN_PROGRESS" | "COMPLETED">("NOT_STARTED");
-  const [quickMissingIngredient, setQuickMissingIngredient] = useState<string | null>(null);
+  const [isMissingModalOpen, setIsMissingModalOpen] = useState(false);
+  const [selectedIngredient, setSelectedIngredient] = useState<MealIngredientItem | null>(null);
   const [missingBusy, setMissingBusy] = useState(false);
-  const [replanNotice, setReplanNotice] = useState<string | null>(null);
+  const [missingError, setMissingError] = useState<string | null>(null);
+  const [replanAlert, setReplanAlert] = useState<{
+    type: "success" | "warning";
+    message: string;
+    hasReplacement?: boolean;
+    shortfalls?: any[];
+  } | null>(null);
   const [voiceTranscript, setVoiceTranscript] = useState("");
   const [isVoiceProcessing, setIsVoiceProcessing] = useState(false);
   const [interpretationData, setInterpretationData] = useState<{
@@ -88,6 +102,51 @@ export function CookDashboard() {
   const primaryDish = activeDishes[0];
   const instructions = primaryDish?.recipeSnapshot?.instructions || [];
 
+  // Ingredients required for currently selected meal
+  const mealIngredients = useMemo<MealIngredientItem[]>(() => {
+    if (!primaryDish) return [];
+    const seen = new Set<string>();
+    const result: MealIngredientItem[] = [];
+
+    // 1. From primaryDish.requirements
+    if (primaryDish.requirements && Array.isArray(primaryDish.requirements)) {
+      for (const req of primaryDish.requirements) {
+        const canonicalId = req.ingredientId || normalizeIngredient(req.name);
+        if (!seen.has(canonicalId)) {
+          seen.add(canonicalId);
+          result.push({
+            ingredientId: canonicalId,
+            name: req.name || canonicalId,
+            quantityText:
+              req.quantity !== null && req.quantity !== undefined
+                ? `${req.quantity} ${req.unit || ""}`.trim()
+                : req.unit || "",
+          });
+        }
+      }
+    }
+
+    // 2. From primaryDish.recipeSnapshot.ingredients
+    if (result.length === 0 && primaryDish.recipeSnapshot?.ingredients) {
+      for (const ing of primaryDish.recipeSnapshot.ingredients as any[]) {
+        const canonicalId = ing.ingredientId || normalizeIngredient(ing.name || "");
+        if (!seen.has(canonicalId)) {
+          seen.add(canonicalId);
+          result.push({
+            ingredientId: canonicalId,
+            name: ing.name || canonicalId,
+            quantityText:
+              ing.quantity !== null && ing.quantity !== undefined
+                ? `${ing.quantity} ${ing.unit || ""}`.trim()
+                : ing.unit || "",
+          });
+        }
+      }
+    }
+
+    return result;
+  }, [primaryDish]);
+
   // Toggle ingredient check
   const toggleIngredientCheck = (name: string) => {
     setCheckedIngredients((prev) => ({
@@ -128,43 +187,64 @@ export function CookDashboard() {
   };
 
   // Quick report ingredient unavailable action
-  const handleReportMissing = async (ingredientName: string) => {
+  const handleReportMissing = async (ing: MealIngredientItem) => {
+    if (missingBusy) return;
     setMissingBusy(true);
-    setReplanNotice(null);
+    setMissingError(null);
+    setReplanAlert(null);
     try {
       const res = await fetch("/api/voice/confirm", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          householdId: household?.id || "demo-household",
           actions: [
             {
               type: "inventory_unavailable",
-              ingredient: ingredientName,
+              ingredient: ing.ingredientId, // Canonical ID ensures exact mapping
+              originalIngredientText: ing.name,
             },
           ],
           idempotencyKey: `cook-missing-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-          transcript: `Cook reported ${ingredientName} unavailable.`,
+          transcript: `Cook reported ${ing.name} unavailable via Cook Dashboard.`,
         }),
       });
 
       const json = await res.json();
       if (!res.ok || !json.success) {
-        throw new Error(json.error || "Failed to update kitchen state");
+        throw new Error(
+          json.error || json.details?.formErrors?.[0] || "Failed to update kitchen state"
+        );
       }
 
-      setQuickMissingIngredient(null);
+      setIsMissingModalOpen(false);
+      setSelectedIngredient(null);
       await loadData();
 
-      if (json.data?.replan?.needsReplanning) {
-        setReplanNotice(
-          `Meal plan automatically updated! ${json.data.replan.explanation}`
-        );
+      const replan = json.data?.replan;
+      if (replan?.needsReplanning) {
+        if (replan.hasReplacement) {
+          setReplanAlert({
+            type: "success",
+            message: `${ing.name} marked unavailable in pantry. ${replan.explanation}`,
+            hasReplacement: true,
+          });
+        } else {
+          setReplanAlert({
+            type: "warning",
+            message: `${ing.name} marked unavailable in pantry. ${replan.explanation}`,
+            hasReplacement: false,
+            shortfalls: replan.shortfalls,
+          });
+        }
       } else {
-        setReplanNotice(`Marked ${ingredientName} as unavailable in pantry.`);
+        setReplanAlert({
+          type: "success",
+          message: `Marked ${ing.name} as unavailable in kitchen inventory.`,
+          hasReplacement: true,
+        });
       }
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to report missing ingredient");
+      setMissingError(err instanceof Error ? err.message : "Failed to report missing ingredient");
     } finally {
       setMissingBusy(false);
     }
@@ -224,14 +304,70 @@ export function CookDashboard() {
 
       {error && <ErrorBox message={error} />}
 
-      {/* Replanning Notification Banner */}
-      {replanNotice && (
-        <div className="approval-confirmation-banner" style={{ background: "#ecfdf5", borderColor: "#a7f3d0" }}>
-          <Sparkles className="success-icon" size={24} style={{ color: "#059669" }} />
-          <div>
-            <strong style={{ color: "#065f46" }}>Kitchen State Updated</strong>
-            <p style={{ margin: "2px 0 0", color: "#047857" }}>{replanNotice}</p>
+      {/* Replanning / Inventory Notification Banner */}
+      {replanAlert && (
+        <div
+          className="approval-confirmation-banner"
+          style={{
+            background: replanAlert.type === "success" ? "#ecfdf5" : "#fffbeb",
+            borderColor: replanAlert.type === "success" ? "#a7f3d0" : "#fde68a",
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "space-between",
+            padding: "16px 20px",
+            borderRadius: "10px",
+            marginBottom: "1.5rem",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
+            {replanAlert.type === "success" ? (
+              <Sparkles className="success-icon" size={24} style={{ color: "#059669", flexShrink: 0, marginTop: "2px" }} />
+            ) : (
+              <AlertTriangle size={24} style={{ color: "#d97706", flexShrink: 0, marginTop: "2px" }} />
+            )}
+            <div>
+              <strong style={{ color: replanAlert.type === "success" ? "#065f46" : "#92400e", fontSize: "0.95rem" }}>
+                {replanAlert.type === "success"
+                  ? "Kitchen State & Meal Plan Updated"
+                  : "Meal Invalidation Notice"}
+              </strong>
+              <p style={{ margin: "4px 0 0", color: replanAlert.type === "success" ? "#047857" : "#b45309", fontSize: "0.9rem" }}>
+                {replanAlert.message}
+              </p>
+              {replanAlert.hasReplacement === false && (
+                <div style={{ marginTop: "10px", display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                  <Link
+                    href="/groceries"
+                    className="button secondary"
+                    style={{ fontSize: "0.82rem", padding: "4px 10px", borderColor: "#fde68a" }}
+                  >
+                    <ShoppingBag size={14} /> View Grocery Requirements
+                  </Link>
+                  <Link
+                    href="/meal-planner"
+                    className="button secondary"
+                    style={{ fontSize: "0.82rem", padding: "4px 10px", borderColor: "#fde68a" }}
+                  >
+                    Open Meal Planner
+                  </Link>
+                </div>
+              )}
+            </div>
           </div>
+          <button
+            onClick={() => setReplanAlert(null)}
+            style={{
+              background: "transparent",
+              border: 0,
+              fontSize: "1.3rem",
+              cursor: "pointer",
+              color: replanAlert.type === "success" ? "#065f46" : "#92400e",
+              lineHeight: 1,
+            }}
+            title="Dismiss notice"
+          >
+            ×
+          </button>
         </div>
       )}
 
@@ -369,11 +505,11 @@ export function CookDashboard() {
               </div>
 
               <div className="cook-ingredients-list">
-                {(primaryDish?.requirements || []).map((req, i) => {
+                {mealIngredients.map((req, i) => {
                   const isChecked = !!checkedIngredients[req.name];
                   return (
                     <label
-                      key={i}
+                      key={req.ingredientId || i}
                       className={`cook-ingredient-item ${isChecked ? "checked" : ""}`}
                     >
                       <input
@@ -384,10 +520,23 @@ export function CookDashboard() {
                       />
                       <div className="cook-ing-text">
                         <span className="cook-ing-name">{req.name}</span>
-                        <span className="cook-ing-qty">
-                          {req.quantity !== null ? `${req.quantity} ${req.unit}` : req.unit}
-                        </span>
+                        <span className="cook-ing-qty">{req.quantityText}</span>
                       </div>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setSelectedIngredient(req);
+                          setIsMissingModalOpen(true);
+                          setMissingError(null);
+                        }}
+                        className="icon-button"
+                        title={`Report ${req.name} missing`}
+                        style={{ marginLeft: "auto", color: "#b45309" }}
+                      >
+                        <AlertTriangle size={15} />
+                      </button>
                     </label>
                   );
                 })}
@@ -400,7 +549,11 @@ export function CookDashboard() {
                 </span>
                 <button
                   type="button"
-                  onClick={() => setQuickMissingIngredient(primaryDish?.requirements[0]?.name || "paneer")}
+                  onClick={() => {
+                    setIsMissingModalOpen(true);
+                    setSelectedIngredient(null);
+                    setMissingError(null);
+                  }}
                   className="button secondary"
                   style={{ width: "100%", marginTop: "6px" }}
                 >
@@ -622,67 +775,174 @@ export function CookDashboard() {
                   setInterpretationData(null);
                   setVoiceTranscript("");
                   await loadData();
-                  setReplanNotice(
-                    result.replan?.needsReplanning
+                  setReplanAlert({
+                    type: "success",
+                    message: result.replan?.needsReplanning
                       ? "Inventory updated! Meal plan revalidated and replanned."
-                      : "Kitchen state updated successfully."
-                  );
+                      : "Kitchen state updated successfully.",
+                    hasReplacement: result.replan?.hasReplacement,
+                  });
                 }}
               />
             )}
           </section>
 
           {/* Quick Missing Ingredient Modal */}
-          {quickMissingIngredient && (
+          {isMissingModalOpen && (
             <div className="modal-backdrop">
-              <div className="modal-dialog">
+              <div className="modal-dialog" style={{ maxWidth: "520px" }}>
                 <div className="modal-header">
-                  <h2>Report Ingredient Unavailable</h2>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <AlertTriangle size={20} style={{ color: "#d97706" }} />
+                    <h2 style={{ fontSize: "1.2rem", margin: 0 }}>Report Missing Ingredient</h2>
+                  </div>
                   <button
-                    onClick={() => setQuickMissingIngredient(null)}
+                    onClick={() => {
+                      if (!missingBusy) {
+                        setIsMissingModalOpen(false);
+                        setSelectedIngredient(null);
+                        setMissingError(null);
+                      }
+                    }}
                     className="icon-btn"
+                    disabled={missingBusy}
                   >
                     ×
                   </button>
                 </div>
-                <div style={{ padding: "1rem 0" }}>
-                  <p style={{ marginBottom: "1rem" }}>
-                    Select which ingredient is finished or unavailable in the kitchen:
+                <div style={{ padding: "1.2rem 0" }}>
+                  <p style={{ margin: "0 0 1rem", fontSize: "0.92rem", color: "#4b5563" }}>
+                    Select which ingredient is finished or unavailable for{" "}
+                    <strong>{primaryDish?.recipeName || "this meal"}</strong>:
                   </p>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", marginBottom: "1.5rem" }}>
-                    {(primaryDish?.requirements || []).map((req) => (
-                      <button
-                        key={req.name}
-                        type="button"
-                        className={`choice-chip ${quickMissingIngredient === req.name ? "selected" : ""}`}
-                        onClick={() => setQuickMissingIngredient(req.name)}
-                      >
-                        {req.name}
-                      </button>
-                    ))}
+
+                  {/* List of ingredients required for the selected meal */}
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))",
+                      gap: "0.5rem",
+                      maxHeight: "220px",
+                      overflowY: "auto",
+                      marginBottom: "1.2rem",
+                      padding: "2px",
+                    }}
+                  >
+                    {mealIngredients.map((ing) => {
+                      const isSelected = selectedIngredient?.ingredientId === ing.ingredientId;
+                      return (
+                        <button
+                          key={ing.ingredientId}
+                          type="button"
+                          className={`choice-chip ${isSelected ? "selected" : ""}`}
+                          onClick={() => {
+                            setSelectedIngredient(ing);
+                            setMissingError(null);
+                          }}
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            alignItems: "flex-start",
+                            padding: "8px 10px",
+                            textAlign: "left",
+                          }}
+                        >
+                          <span style={{ fontWeight: 600, fontSize: "0.88rem" }}>
+                            {ing.name}
+                          </span>
+                          <span style={{ fontSize: "0.75rem", opacity: 0.8 }}>
+                            {ing.quantityText}
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
 
-                  <div style={{ background: "#fef3c7", padding: "12px", borderRadius: "8px", border: "1px solid #fde68a", fontSize: "0.9rem", color: "#92400e" }}>
-                    ⚠️ Reporting <strong>{quickMissingIngredient}</strong> unavailable will mark it in kitchen inventory and trigger automatic replanning of today's meal.
-                  </div>
+                  {/* Error display if operation failed */}
+                  {missingError && (
+                    <div
+                      style={{
+                        background: "#fef2f2",
+                        border: "1px solid #fecaca",
+                        color: "#991b1b",
+                        padding: "10px 12px",
+                        borderRadius: "8px",
+                        fontSize: "0.85rem",
+                        marginBottom: "1rem",
+                      }}
+                    >
+                      {missingError}
+                    </div>
+                  )}
+
+                  {/* Explicit Confirmation Block */}
+                  {selectedIngredient ? (
+                    <div
+                      style={{
+                        background: "#fffbeb",
+                        border: "1px solid #fde68a",
+                        borderRadius: "8px",
+                        padding: "12px 14px",
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontWeight: 600,
+                          color: "#92400e",
+                          fontSize: "0.92rem",
+                          marginBottom: "4px",
+                        }}
+                      >
+                        Mark &quot;{selectedIngredient.name}&quot; as unavailable?
+                      </div>
+                      <p style={{ margin: 0, fontSize: "0.82rem", color: "#b45309", lineHeight: 1.4 }}>
+                        This will set {selectedIngredient.name} to 0 in persistent inventory and automatically revalidate today&apos;s meal using the Phase 2 solver.
+                      </p>
+                    </div>
+                  ) : (
+                    <div
+                      style={{
+                        fontSize: "0.85rem",
+                        color: "#6b7280",
+                        fontStyle: "italic",
+                        textAlign: "center",
+                        padding: "8px",
+                      }}
+                    >
+                      Tap an ingredient above to select it.
+                    </div>
+                  )}
                 </div>
 
                 <div className="modal-footer" style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem" }}>
                   <button
                     type="button"
-                    onClick={() => setQuickMissingIngredient(null)}
+                    onClick={() => {
+                      setIsMissingModalOpen(false);
+                      setSelectedIngredient(null);
+                      setMissingError(null);
+                    }}
+                    disabled={missingBusy}
                     className="button secondary"
                   >
                     Cancel
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleReportMissing(quickMissingIngredient)}
-                    disabled={missingBusy}
+                    onClick={() => {
+                      if (selectedIngredient) {
+                        handleReportMissing(selectedIngredient);
+                      }
+                    }}
+                    disabled={!selectedIngredient || missingBusy}
                     className="button primary"
                     style={{ background: "#dc2626" }}
                   >
-                    {missingBusy ? "Replanning..." : `Confirm ${quickMissingIngredient} Unavailable`}
+                    {missingBusy
+                      ? "Replanning..."
+                      : selectedIngredient
+                        ? `Confirm ${selectedIngredient.name} Unavailable`
+                        : "Select Ingredient"}
                   </button>
                 </div>
               </div>

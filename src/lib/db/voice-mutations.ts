@@ -22,6 +22,8 @@ export interface ReplanResult {
   invalidatedMealTypes: string[];
   newRecommendations?: Menu[];
   explanation: string;
+  hasReplacement?: boolean;
+  shortfalls?: unknown[];
 }
 
 export interface ApplyVoiceActionsResult {
@@ -429,11 +431,22 @@ export async function applyConfirmedVoiceActions(
     );
 
     // 3. Automatic Replanning: Check today's active meal plans
-    const todayStr = new Date().toISOString().slice(0, 10);
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    const todayDate = new Date(todayStr);
+
     const existingPlans = await tx.mealPlan.findMany({
       where: {
         householdId: HOUSEHOLD_ID,
-        scheduledAt: new Date(todayStr),
+        OR: [
+          { scheduledAt: todayDate },
+          {
+            scheduledAt: {
+              gte: new Date(todayStr + "T00:00:00.000Z"),
+              lte: new Date(todayStr + "T23:59:59.999Z"),
+            },
+          },
+        ],
         status: { in: ["READY", "NEEDS_CONFIRMATION", "REQUIRES_SHOPPING"] },
       },
       include: { dishes: true, participants: true },
@@ -444,6 +457,7 @@ export async function applyConfirmedVoiceActions(
       affectedPlansCount: 0,
       invalidatedMealTypes: [],
       explanation: "No active meal plans were affected.",
+      hasReplacement: false,
     };
 
     if (inventoryOrFastingChanged && existingPlans.length > 0) {
@@ -453,8 +467,9 @@ export async function applyConfirmedVoiceActions(
       for (const plan of existingPlans) {
         // Re-evaluate current dishes against latest inventory & member state
         let currentMenuValid = true;
+        let evaluatedMenu: Menu | null = null;
         try {
-          const reCheckMenu = evaluateMenu(
+          evaluatedMenu = evaluateMenu(
             {
               date: todayStr,
               mealType: plan.mealType as any,
@@ -475,7 +490,13 @@ export async function applyConfirmedVoiceActions(
             updatedPlanData
           );
 
-          if (reCheckMenu.status === "REJECTED") {
+          if (
+            evaluatedMenu.status === "REJECTED" ||
+            evaluatedMenu.status === "REQUIRES_SHOPPING" ||
+            evaluatedMenu.inventory.ingredients.some(
+              (i) => i.status === "CONFIRMED_UNAVAILABLE" || (i.missing !== null && i.missing > 0)
+            )
+          ) {
             currentMenuValid = false;
           }
         } catch {
@@ -510,8 +531,16 @@ export async function applyConfirmedVoiceActions(
 
           replanResult.newRecommendations = recommendations.menus;
 
-          // Automatically replace with top feasible alternative if available
-          const topAlternative = recommendations.menus.find((m) => m.status !== "REJECTED");
+          // Automatically replace with top feasible alternative that is cookable with in-stock pantry items
+          const topAlternative = recommendations.menus.find((m) => {
+            if (m.status === "REJECTED") return false;
+            // Recipe must not have any confirmed unavailable ingredients or active shortages
+            const hasShortageOrUnavailable = m.inventory.ingredients.some(
+              (i) => i.status === "CONFIRMED_UNAVAILABLE" || (i.missing !== null && i.missing > 0)
+            );
+            return !hasShortageOrUnavailable;
+          });
+
           if (topAlternative) {
             const newSnapshot = JSON.parse(
               JSON.stringify({
@@ -536,6 +565,7 @@ export async function applyConfirmedVoiceActions(
               data: {
                 status: topAlternative.status,
                 stateVersion: updatedPlanData.stateVersion,
+                recipeId: topAlternative.dishes[0]?.recipeId || null,
                 snapshot: newSnapshot,
                 dishes: {
                   create: topAlternative.dishes.map((d) => ({
@@ -556,9 +586,15 @@ export async function applyConfirmedVoiceActions(
               `Self-correcting replan: ${plan.mealType} meal updated to ${newDishNames} due to latest kitchen changes.`
             );
 
+            replanResult.hasReplacement = true;
             replanResult.explanation = `Existing ${plan.mealType} plan became invalid and was automatically replaced with ${newDishNames}.`;
           } else {
-            replanResult.explanation = `Existing ${plan.mealType} plan became invalid due to inventory or fasting changes. No feasible alternative recipe is currently available. Check grocery gaps.`;
+            replanResult.hasReplacement = false;
+            const shortfalls =
+              evaluatedMenu?.inventory?.groceries ||
+              recommendations.menus.flatMap((m) => m.inventory?.groceries || []);
+            replanResult.shortfalls = shortfalls;
+            replanResult.explanation = `Existing ${plan.mealType} plan became invalid due to unavailable ingredients. No feasible alternative recipe is currently cookable with in-stock pantry items. Check grocery requirements.`;
           }
         }
       }
