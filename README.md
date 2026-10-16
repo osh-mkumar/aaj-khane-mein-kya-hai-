@@ -1,228 +1,242 @@
-# RasoiOS — End-to-End Kitchen Intelligence System
-**The Voice-First, Self-Correcting Household Kitchen Operating System.** Built for Renaissance 2026.
+# RasoiOS — The Voice-First, Self-Correcting Household Kitchen Operating System
 
-RasoiOS answers the daily question:
-> **"What should our household cook today, given who is eating, what is available, dietary restrictions, time, and changing circumstances?"**
+> **"What should our household cook today, given who is eating, what is available in the pantry, dietary restrictions, available time, and fast-changing circumstances?"**
 
-Unlike a recipe chatbot, RasoiOS maintains persistent household state, understands Hindi/English/Hinglish kitchen speech, requests explicit user confirmation for proposed changes, commits atomic state updates, and **automatically replans affected meals when kitchen reality changes**.
+RasoiOS is an end-to-end, deterministic kitchen intelligence system designed for real Indian households. Unlike generic recipe chatbots, RasoiOS maintains persistent household state, understands code-mixed Hindi/English/Hinglish kitchen speech, requires human-in-the-loop confirmation before modifying inventory, and **automatically replans affected meals when kitchen reality changes**.
 
 ---
 
-## 🌟 Key Capabilities
+## 🌟 Key Innovations & Capabilities
 
-1. **Voice-First Input with Groq Whisper & WebSpeech**:
-   - High-accuracy speech-to-text using Groq `whisper-large-v3-turbo`.
-   - Browser WebSpeech API fallback + manual typing fallback.
-   - Code-mixed Hindi, English, and Hinglish understanding without forced restrictive language parameters.
-2. **Resilient AI Command Interpretation**:
-   - Primary: Gemini `gemini-3.1-flash-lite` server-side extraction.
-   - Secondary: Groq `openai/gpt-oss-20b` automatic fallback on Gemini rate limits, 503 overloads, or service disruptions.
-   - Strict Zod schema validation over all AI outputs; LLMs never write directly to the database.
-   - Distinguishes between available stock (*"palak aadha kilo bacha hai"*) and requirements/wishes (*"palak chahiye"*).
-3. **Transparent Human Confirmation**:
-   - Plain-language preview of interpreted kitchen actions before any mutation.
-   - Edit, discard, or confirm individual proposals with idempotent transaction tokens (`idempotencyKey`).
-4. **Self-Correcting Meal Replanning**:
-   - Confirmed changes (e.g., *"Paneer khatam ho gaya"*) atomically update inventory availability and recalculate affected meals.
-   - Deterministic TypeScript meal solver detects now-infeasible dishes, marks old plans stale/rejected, and finds viable alternatives with explanations.
-5. **Cook Mode with Multilingual TTS**:
-   - Hands-free cooking view with step-by-step navigation, dynamic serving scaling, and ingredient checklists.
-   - Browser `SpeechSynthesis` read-aloud support for Hindi, English, and Marathi.
-   - Direct supplementary YouTube recipe search query generator without requiring YouTube API keys or web scraping.
-6. **Grocery Gap Aggregator**:
-   - Compares planned meal requirements against current stock to highlight missing ingredients, shortfalls, and affected recipes.
+### 1. Dual Dashboard Architecture (`/family` & `/cook`)
+- **Instant Demo-Mode Role Switcher**: A single toggle in the navigation header (**Family | Cook**) lets users switch perspectives instantly without passwords, OTPs, or authentication.
+- **Family Dashboard (`/family`)**: The planning command center. Manage multi-generational household members, dietary preferences, Jain/fasting rules, allergies, pantry inventory, deterministic meal planning, and grocery shortages.
+- **Cook Dashboard (`/cook`)**: Task-focused and touch-friendly for tablets and mobile kitchen counters. Answers *"What am I cooking? What ingredients? What next? What if something is missing?"* Features large text, tap-to-check ingredients checklist, one-step-at-a-time instructions, browser Text-to-Speech (Hindi, English, Marathi), 1-tap "Report Missing Ingredient" actions, and live auto-replanning.
+- **Shared Live State**: Both dashboards read from and write to the same SQLite database. Any update reported by the cook immediately updates the family meal plan and vice-versa.
+
+### 2. Mendeley Indian Recipe Dataset Integration
+- Integrates the 24 MB real-world **Mendeley Indian Recipe Dataset** (6,871 recipes from Archana's Kitchen, CC BY 4.0 by Kanishka Jain) alongside authentic household dishes.
+- **Reproducible Ingestion Pipeline**: State-machine CSV parser, compound fraction normalizer (`2-1/2` → `2.5`), unit standardizer, and ingredient deduplicator.
+- **Solver Protection Rule**: Recipes missing crucial metadata or cooking times are marked as *Inspiration Only* and are strictly excluded from deterministic feasibility calculations, ensuring no user is recommended an uncookable meal.
+
+### 3. Voice-First Multilingual Speech & Interpretation
+- **Groq Whisper Large-v3-Turbo**: High-accuracy speech-to-text supporting code-mixed Hindi, English, and Hinglish.
+- **Browser WebSpeech & Text Fallback**: Graceful fallback when microphone permissions are denied or when typing is preferred.
+- **Resilient AI Pipeline**: Server-side command interpretation via **Gemini 3.1 Flash Lite**, with automatic fallback to **Groq `openai/gpt-oss-20b`** on rate limits (HTTP 429), server overloads (HTTP 503), or service outages.
+
+### 4. Human-in-the-Loop Confirmation & Self-Correction
+- **No Direct LLM Writes**: AI models never modify the database directly. Proposed actions are parsed into strict Zod schemas and presented in a transparent preview modal.
+- **Idempotent Mutations**: Batches use an `idempotencyKey` preventing race conditions or double updates.
+- **Automated Self-Correcting Replanning**: When an ingredient is marked unavailable (*"Paneer khatam ho gaya"*), RasoiOS invalidates the scheduled meal, activates the deterministic solver, and recommends feasible alternatives.
 
 ---
 
-## 🚀 Quickstart & Setup
+## 🏗️ System Architecture
+
+```
++---------------------------------------------------------------------------------------+
+|                                    RasoiOS Header                                     |
+|                       [ Role Switcher:  Family  |  Cook ]                             |
++-------------------------------------------+-------------------------------------------+
+|             Family Dashboard              |              Cook Dashboard               |
+|                 (/family)                 |                  (/cook)                  |
+|  • Today's Meals & Dietary Notices        |  • Today's Meal & Servings Card           |
+|  • Household Profiles & Fasting Toggles   |  • Dietary Preparation Warnings           |
+|  • Deterministic Meal Solver              |  • Tap-to-Check Ingredients Checklist     |
+|  • Pantry Inventory & Editing             |  • Step-by-Step Cooking + Web TTS         |
+|  • Grocery Gap Shortage Aggregator        |  • Voice Reporting + 1-Tap Missing Alerts |
+|  • State Audit Activity Log               |  • Cooking Progress Tracker               |
++-------------------------------------------+-------------------------------------------+
+                     │                                            │
+                     ▼                                            ▼
++---------------------------------------------------------------------------------------+
+|                                  API & Service Layer                                  |
+|  • /api/voice/transcribe (Groq Whisper Large-v3-Turbo)                                |
+|  • /api/voice/interpret  (Gemini 3.1 Flash Lite -> Groq GPT-OSS-20B Fallback)         |
+|  • /api/voice/confirm    (Atomic Transaction Mutations + Automatic Replanning)        |
+|  • /api/meals/recommend  (Phase 2 Deterministic TypeScript Constraint Solver)         |
+|  • /api/groceries/gaps   (Inventory vs. Planned Meals Shortfall Aggregator)           |
++---------------------------------------------------------------------------------------+
+                                            │
+                                            ▼
++---------------------------------------------------------------------------------------+
+|                         Shared SQLite Database (Prisma ORM)                           |
+|      Household  •  Members  •  Inventory  •  Recipes  •  MealPlans  •  ActivityLogs     |
++---------------------------------------------------------------------------------------+
+```
+
+---
+
+## 🚀 Quickstart & Installation
 
 ### Prerequisites
-- Node.js 22.12+ (Node 24 LTS recommended)
-- npm
+- **Node.js**: v22.12.0 or later (Node 24 LTS recommended)
+- **npm**: v10+
+- **Git**
 
-### 1. Clone & Install
+### 1. Clone & Checkout Branch
 ```bash
+git clone https://github.com/Sodhani0007/aaj-kya-hai-khane-mein.git
+cd aaj-kya-hai-khane-mein
 git checkout feature/phase3-ai-integration
+```
+
+### 2. Install Dependencies
+```bash
 npm install
 ```
 
-### 2. Configure Environment Variables
-Copy or configure `.env.local` with your API keys:
+### 3. Configure Environment Variables
+Create or verify `.env.local` in the project root:
 ```env
 DATABASE_URL="file:./prisma/dev.db"
 GEMINI_API_KEY="your-gemini-api-key"
 GROQ_API_KEY="your-groq-api-key"
 ```
-*(Note: Both AI providers run strictly server-side. No API keys are bundled to client-side code).*
+*(Note: All AI credentials operate strictly server-side. No API keys are bundled into client code).*
 
-### 3. Setup Database & Seed
+### 4. Database Setup & Seeding
 ```powershell
 npm run db:setup
 ```
-This runs SQLite migrations and seeds the database with a realistic multi-generational Indian household (including vegetarian, Jain, and fasting members), canonical ingredients, and 15 authentic recipes.
+This runs Prisma migrations, creates SQLite tables, seeds the realistic Mehta household (with Jain, vegetarian, and fasting members), loads 15 curated recipes, and imports regional dishes from the Mendeley dataset.
 
-### 4. Run the Application
+*(Optional standalone dataset import)*:
+```powershell
+npm run db:import-mendeley
+```
+
+### 5. Start the Development Server
 ```powershell
 npm run dev
 ```
-Open **http://127.0.0.1:3000** in your browser.
+Open **[http://127.0.0.1:3000](http://127.0.0.1:3000)** in your browser.
 
 ---
 
-## 🧪 Automated Verification & Tests
+## 👥 Dual Dashboard Navigation
 
-To execute the test suite (58 tests covering Phase 1, Phase 2, Phase 3 voice validation, mutations, and replanning):
-```powershell
-npm test
-```
+| Perspective | Route | Key Purpose | Primary Actions |
+| :--- | :--- | :--- | :--- |
+| **Family Dashboard** | `/family` | Household planning and constraints | Plan meals, manage members, set fasting rules, review grocery gaps |
+| **Cook Dashboard** | `/cook` | Kitchen execution and preparation | View active dish, check ingredients, read aloud steps, report shortages |
 
-To run TypeScript compiler verification:
-```powershell
-npx tsc --noEmit
-```
-
-To run Next.js production build:
-```powershell
-npm run build
-```
-
----
-
-## 🎙️ The 6 End-to-End Demo Scenarios
-
-### Scenario A — Initial Meal Planning
-1. Navigate to **Meal Planner** (`/meal-planner`).
-2. Select lunch for all participating household members.
-3. Click **Find Menus**.
-4. The deterministic solver evaluates inventory, fasting status, cooking time, and dietary constraints, outputting recommended menus with complete constraint explanations.
-
-### Scenario B — Ingredient Becomes Unavailable & Auto-Replanning
-1. Navigate to **Voice Assistant** (`/voice`).
-2. Speak or type: `"Paneer khatam ho gaya."`
-3. Click **Interpret Kitchen Voice**.
-4. Review the interpreted proposal: `Mark paneer as UNAVAILABLE`.
-5. Click **Confirm & Apply to Kitchen**.
-6. RasoiOS updates inventory to `UNAVAILABLE`, detects that today's lunch (e.g. *Palak Paneer*) is no longer feasible, rejects the old plan, searches for a viable alternative (e.g. *Aloo Palak* or *Dal Tadka*), and refreshes cooking instructions.
-
-### Scenario C — Quantity Update with Unit Conversion
-1. In the Voice Assistant, speak or type: `"Palak aadha kilo bacha hai."`
-2. Interpret: Proposals show `Set spinach quantity to 500 g`.
-3. Confirm: The database updates the stock. View the update in **Kitchen Inventory** (`/inventory`).
-
-### Scenario D — Fasting Status Adaptation
-1. In the Voice Assistant, speak or type: `"Aaj dadi ka vrat hai."`
-2. Interpret: Maps `"dadi"` to member *Sushila* and sets fasting active.
-3. Confirm: Sushila's fasting rules are activated. Any planned meals are checked against fasting constraints, ensuring grains/onions/garlic are excluded for her.
-
-### Scenario E — Provider Fallback Simulation
-1. If Gemini encounters rate limiting or 503 overload, the system seamlessly falls back to Groq `openai/gpt-oss-20b`.
-2. The user experience remains uninterrupted, and the provider metadata reflects which engine served the request.
-
-### Scenario F — Voice Fallback to Typing
-1. If microphone permission is denied or the user is in a noisy environment, use the manual text entry field.
-2. The exact same interpretation, validation, confirmation, and replanning pipeline executes.
-
----
-
-## 👥 Dual Dashboard Architecture
-
-RasoiOS provides two dedicated operational interfaces sharing the **exact same SQLite database and live state**:
-
-```
-+-------------------------------------------------------------+
-|                 Top Navigation: [ Family | Cook ]           |
-+------------------------------+------------------------------+
-|       Family Dashboard       |        Cook Dashboard        |
-|           (/family)          |            (/cook)           |
-+------------------------------+------------------------------+
-| • Who is eating today?       | • What am I cooking right now?|
-| • Dietary & fasting rules    | • Serving count & time       |
-| • Deterministic meal planner | • Dietary preparation alerts |
-| • Pantry stock & editing     | • Interactive ingredients tap|
-| • Grocery gap aggregator     | • Step-by-step cooking guide |
-| • Household activity history | • Browser TTS (Hindi/En/Mr)  |
-| • Voice Assistant interface  | • Quick voice reporting      |
-|                              | • 1-tap "Ingredient missing" |
-|                              | • Real-time auto-replanning  |
-+------------------------------+------------------------------+
-|                     Shared SQLite Database                  |
-|  (Household • Members • Inventory • MealPlans • Activity)   |
-+-------------------------------------------------------------+
-```
-
-### 1. Instant Role Switcher
-- Visible toggle in the application header: **Family | Cook**.
-- Zero login, password, OTP, or verification needed.
-- Demo-mode role switcher persisted across browser sessions via `localStorage.getItem("rasoios_active_role")`.
-- Default to **Family Dashboard** for first-time visitors.
-
-### 2. Family Dashboard (`/family`)
-- High-density planning console.
-- Today's breakfast, lunch, and dinner cards.
-- Member management with vegetarian, vegan, Jain, allergy, dislike, and fasting preferences.
-- Phase 2 deterministic constraint solver recommendations with reasons and alternatives.
-- Consolidated grocery shortages and kitchen audit history.
-
-### 3. Cook Dashboard (`/cook`)
-- Task-focused, accessible, touch-friendly interface designed for tablet/mobile kitchen counters:
-  - **"What am I cooking?"**: Active dish title, meal type, number of servings, estimated cooking time.
-  - **Dietary Notices**: Prominent warning banners (e.g. *"Dadi (Sushila) has an active Fast today. Prepare separate dishes without onion, garlic, or grains"*).
-  - **Ingredients Checklist**: Tap-to-check ingredients with required vs. available quantities.
-  - **Step-by-Step Cooking**: High-contrast, one-step-at-a-time instructions with Next/Previous navigation, browser speech synthesis read-aloud (Hindi, English, Marathi), and direct YouTube search links.
-  - **Report Kitchen Changes**: Voice microphone button + manual text input for quick updates (*"Paneer khatam ho gaya"*, *"Palak aadha kilo bacha hai"*).
-  - **Quick Missing Ingredient Action**: One-tap "Report Missing" button with immediate stock invalidation, deterministic meal revalidation, and alternate recipe replacement.
-  - **Cooking Progress**: Track meal status (`NOT_STARTED` -> `IN_PROGRESS` -> `COMPLETED`) with localStorage persistence.
+- Switch between dashboards anytime via the topbar toggle.
+- Preferences are saved in `localStorage.rasoios_active_role` across refreshes.
 
 ---
 
 ## 📚 Mendeley Indian Recipe Dataset Integration
 
-RasoiOS integrates the real-world **Mendeley Indian Recipe Dataset** from Archana's Kitchen to power its regional Indian recipe library alongside manually curated household dishes.
-
-- **Source**: [Mendeley Data xsphgmmh7b.1](https://data.mendeley.com/datasets/xsphgmmh7b/1/files/6fb5ae32-a815-4b8f-9d68-8d512227eac8)
-- **Author**: Kanishka Jain
+- **Dataset Source**: [Mendeley Data xsphgmmh7b.1](https://data.mendeley.com/datasets/xsphgmmh7b/1/files/6fb5ae32-a815-4b8f-9d68-8d512227eac8)
+- **Author**: Kanishka Jain (Archana's Kitchen collection)
 - **License**: Creative Commons Attribution 4.0 International (CC BY 4.0)
-- **File Name**: `IndianFoodDatasetCSV.csv` (24.15 MB, 6,871 recipe records)
-- **Discovered Columns (15)**:
+- **File**: `IndianFoodDatasetCSV.csv` (24.15 MB, 6,871 records)
+- **15 Columns Discovered & Parsed**:
   `Srno`, `RecipeName`, `TranslatedRecipeName`, `Ingredients`, `TranslatedIngredients`, `PrepTimeInMins`, `CookTimeInMins`, `TotalTimeInMins`, `Servings`, `Cuisine`, `Course`, `Diet`, `Instructions`, `TranslatedInstructions`, `URL`.
 
-### Ingestion & Normalization Rules
-1. **Multiline Quoted CSV Parser**: Custom state-machine parser handling commas, quotes, and multiline text inside recipe descriptions.
-2. **Deterministic Quantity & Unit Parsing**: Parses compound fractions (`2-1/2` -> `2.5`, `1/2` -> `0.5`, `3/4` -> `0.75`), decimal numbers, and converts raw text units into canonical RasoiOS units (`tbsp`, `tsp`, `cup`, `g`, `kg`, `clove`, `pinch`).
-3. **No Hallucinated Quantities**: Recipes without explicit ingredient quantities preserve original text but mark quantities as `UNKNOWN` rather than inventing quantities.
-4. **Solver Protection Rule**: Recipes marked incomplete (`isComplete: false` or missing critical cooking metadata) are flagged as **"Inspiration Only"** in the recipe catalog and are **strictly excluded** from deterministic feasibility calculation and meal planning solver candidates.
-5. **Attribution**: Every imported recipe carries dataset attribution in `dietaryMetadata.attribution`.
-6. **Curated Recipe Preservation**: Existing 15 local curated recipes (`source: "LOCAL"`) remain untouched.
-
-### Running Dataset Ingestion
-To run the reproducible importer:
-```powershell
-npm run db:import-mendeley
-```
+### Ingestion Metrics
+- **Total Records in File**: 6,871
+- **Complete & Verified Candidates**: 6,507
+- **Incomplete / Inspiration Only**: 364
+- **Seeded Set**: 100 regionally balanced dishes (North Indian, South Indian, Maharashtrian, Gujarati, Bengali) + curated household originals.
+- **Incomplete Recipe Protection**: Recipes flagged `isComplete: false` are visible in the recipe catalog for inspiration, but **strictly barred** from deterministic feasibility calculation and meal planning solver candidates (`INCOMPLETE_DATASET_RECIPE` rule violation).
 
 ---
 
-## 📡 API Endpoints
+## 🎙️ The 6 End-to-End Demo Scenarios
+
+### Scenario A — Initial Family Meal Planning
+1. Open **Family Dashboard** (`/family` or `/meal-planner`).
+2. Select **Lunch**, set cooking time to **45 minutes**, and choose participating household members.
+3. Click **Find Menus**.
+4. The deterministic solver evaluates inventory, fasting rules, and preparation time, recommending valid menus with detailed constraint explanations.
+
+### Scenario B — Cook Reports Missing Ingredient & Automatic Replanning
+1. Family schedules *Palak Paneer* for lunch.
+2. Cook opens **Cook Dashboard** (`/cook`) and sees *Palak Paneer* with required ingredients and steps.
+3. Cook clicks the microphone or taps: `"Paneer khatam ho gaya."`
+4. Review the interpreted proposal: `Mark paneer as UNAVAILABLE`.
+5. Cook confirms:
+   - `paneer` stock is set to `UNAVAILABLE` in the shared SQLite database.
+   - The active lunch plan with *Palak Paneer* is invalidated (`REJECTED`).
+   - The solver automatically re-evaluates pantry stock and recommends a feasible replacement (e.g. *Dal Tadka* or *Aloo Palak*).
+   - Both Cook and Family dashboards immediately reflect the updated menu.
+
+### Scenario C — Stock Quantity Update with Unit Normalization
+1. Cook or family speaks: `"Palak aadha kilo bacha hai."`
+2. AI interpreter normalizes `"aadha kilo"` to `500 g` and maps `"palak"` to canonical `spinach`.
+3. Confirming the proposal updates the inventory stock and recalculates grocery gap requirements.
+
+### Scenario D — Dynamic Fasting Status Adaptation
+1. Speak or type: `"Aaj dadi ka vrat hai."`
+2. Interpreter identifies `"dadi"` as member *Sushila* and toggles her temporary fasting rule to `active`.
+3. Confirmed action immediately enforces fasting restrictions: all dishes prepared for Sushila exclude grains, onions, and garlic, allowing only approved fasting ingredients (e.g., *sabudana*, *potato*, *rock salt*).
+
+### Scenario E — Resilient AI Provider Fallback
+1. If Gemini encounters rate limits (HTTP 429) or service outages (HTTP 503), RasoiOS automatically routes the request to Groq `openai/gpt-oss-20b`.
+2. The user experience remains uninterrupted, and the response metadata indicates the active provider and fallback status.
+
+### Scenario F — Voice Fallback to Text Entry
+1. If microphone access is denied or ambient kitchen noise is high, the cook or family user can type directly into the input field.
+2. The exact same interpretation, validation, confirmation, and auto-replanning pipeline executes.
+
+---
+
+## 🧪 Automated Testing & Verification
+
+RasoiOS includes an exhaustive test suite covering all four phases of development:
+
+```powershell
+# Run all Vitest suites (66/66 tests passing)
+npm test
+
+# Run TypeScript compiler verification (0 errors)
+npm run typecheck
+
+# Run Next.js production build
+npm run build
+```
+
+### Test Suite Breakdown
+| Test Suite | File | Tests | Coverage |
+| :--- | :--- | :---: | :--- |
+| **Phase 1** | `tests/phase1.test.ts` | 13 | Household lifecycle, members, dietary rules, inventory CRUD, and unit conversions |
+| **Phase 2** | `tests/phase2.test.ts` | 32 | Scaling, dietary verifier, deterministic solver, grocery gap aggregation |
+| **Phase 3 Voice** | `tests/phase3_voice.test.ts` | 9 | Zod schemas, proposed actions, interpretation payloads |
+| **Phase 3 Mutations**| `tests/phase3_mutations.test.ts`| 4 | Atomic database mutations, idempotency tokens, replan triggering |
+| **Phase 4 Integration**| `tests/phase4_dual_dashboard_mendeley.test.ts` | 8 | Mendeley CSV parser, unit parsing, solver exclusion, shared dual-dashboard state |
+| **Total** | | **66** | **100% Passing** |
+
+---
+
+## 📡 API Reference
 
 | Endpoint | Method | Description |
-| :--- | :--- | :--- |
-| `/api/voice/transcribe` | `POST` | Groq Whisper speech-to-text with code-mixed support |
-| `/api/voice/interpret` | `POST` | Gemini -> Groq command interpreter with Zod validation |
+| :--- | :---: | :--- |
+| `/api/voice/transcribe` | `POST` | Groq Whisper speech-to-text with code-mixed audio support |
+| `/api/voice/interpret` | `POST` | Gemini → Groq command interpreter with strict Zod validation |
 | `/api/voice/confirm` | `POST` | Atomic mutation executor with idempotency & auto-replanning |
 | `/api/groceries/gaps` | `GET` | Aggregated shortages for upcoming scheduled meals |
-| `/api/household` | `GET` | Household profiles, members, and inventory state |
-| `/api/recipes` | `GET` | Recipe catalog with ingredients and steps |
-| `/api/meals/recommend` | `POST` | Deterministic meal solver recommendations |
+| `/api/household` | `GET, PATCH` | Household profiles, members, and inventory state |
+| `/api/recipes` | `GET, POST` | Recipe catalog with ingredients, steps, and verification badges |
+| `/api/meals/recommend` | `POST` | Phase 2 deterministic constraint solver recommendations |
 | `/api/meals` | `GET, POST` | Retrieve or persist approved meal plans |
-| `/api/activity` | `GET` | Audit log with timestamps and state versions |
+| `/api/activity` | `GET` | Audit log with timestamps, sources, and state versions |
 
 ---
 
 ## 🔒 Security & Reliability Guarantees
-- **No Direct LLM Writes**: All AI interpretations are validated against strict Zod schemas before being shown to the user.
-- **Human-in-the-Loop Confirmation**: No inventory or member state changes occur without explicit user review.
-- **Idempotent Mutations**: Batches use an `idempotencyKey` preventing double submissions or race conditions.
-- **Zero Hallucinated Recipes**: Recommendations are strictly resolved from verified household recipe templates and real pantry stock.
-- **Incomplete Dataset Protection**: Incomplete recipes are strictly flagged and barred from meal solver candidates.
-- **No Leaked Secrets**: All API keys remain server-side.
 
+1. **No Direct LLM Database Writes**: Large language models never write directly to the database. All interpretations are parsed into validated schema objects for user approval.
+2. **Deterministic Feasibility**: Inventory feasibility and dietary constraints are calculated mathematically in TypeScript, never guessed by an LLM.
+3. **Idempotent Mutations**: Every confirmation payload requires an `idempotencyKey` preventing duplicate execution or race conditions.
+4. **Server-Side Credentials**: Gemini and Groq API keys remain strictly server-side.
+5. **Incomplete Dataset Protection**: Incomplete recipes are strictly flagged and cannot be marked feasible by the solver.
+
+---
+
+## 📄 License & Attribution
+
+- **Application Code**: MIT License. Built for Renaissance 2026.
+- **Recipe Dataset**: [Mendeley Data](https://data.mendeley.com/datasets/xsphgmmh7b/1/files/6fb5ae32-a815-4b8f-9d68-8d512227eac8), Author: Kanishka Jain, licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
