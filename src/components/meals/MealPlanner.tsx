@@ -8,6 +8,7 @@ import { mealTypes } from "@/lib/validation/planning";
 import { api, Field, ErrorBox, Loading, Empty, Modal } from "../ui/shared";
 import { MealCard, menuLabel } from "./MealCard";
 import { RecipeGenerator } from "../recipes/RecipeGenerator";
+import { RecipeSearchAutocomplete } from "../recipes/RecipeSearchAutocomplete";
 export function localDate() {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
@@ -197,11 +198,11 @@ export function MealPlanner() {
           </div>
           <div className="planner-grid secondary-controls">
             <Field label="Preferred dish (optional)">
-              <input
-                maxLength={120}
+              <RecipeSearchAutocomplete
                 value={request.requestedDish}
                 placeholder="Try Tadka Dal or your family’s favourite"
-                onChange={(e) => update("requestedDish", e.target.value)}
+                onChange={(val) => update("requestedDish", val)}
+                onSelect={(recipe) => update("requestedDish", recipe.name)}
               />
             </Field>
             <Field label="AI recipe language">

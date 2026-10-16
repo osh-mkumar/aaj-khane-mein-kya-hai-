@@ -14,6 +14,7 @@ import {
   PlayCircle,
 } from "lucide-react";
 import { CookMode } from "./CookMode";
+import { RecipeSearchAutocomplete } from "./RecipeSearchAutocomplete";
 import type { Recipe, Ingredient } from "@/types";
 import { units } from "@/lib/validation";
 import {
@@ -316,15 +317,18 @@ export function RecipeLibrary() {
             </button>
           ))}
         </div>
-        <div className="search">
-          <Search size={18} />
-          <input
-            aria-label="Search recipes"
-            placeholder="Find a favourite…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-        </div>
+        <RecipeSearchAutocomplete
+          value={query}
+          onChange={setQuery}
+          onSelect={(recipe) => {
+            if (filter !== "all" && recipe.source !== filter) {
+              setFilter("all");
+            }
+            setSelected(recipe);
+          }}
+          recipes={recipes}
+          placeholder="Find a favourite…"
+        />
       </div>
       {!recipes ? (
         <Loading />
