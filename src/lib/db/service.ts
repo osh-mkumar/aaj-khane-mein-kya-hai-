@@ -28,6 +28,7 @@ export const recipeInclude = {
 export const recipeScope = {
   OR: [
     { source: "LOCAL" },
+    { source: "MENDELEY" },
     { custom: { householdId: HOUSEHOLD_ID } },
     { generation: { householdId: HOUSEHOLD_ID } },
   ],

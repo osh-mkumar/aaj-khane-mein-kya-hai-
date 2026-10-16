@@ -350,6 +350,9 @@ export function RecipeLibrary() {
                 {r.source === "HOUSEHOLD_CUSTOM" && (
                   <span className="custom-ribbon">OUR WAY</span>
                 )}
+                {r.source === "MENDELEY" && (
+                  <span className="custom-ribbon" style={{ background: "#0369a1" }}>MENDELEY</span>
+                )}
               </div>
               <div className="recipe-body">
                 <div className="recipe-title">
@@ -357,6 +360,16 @@ export function RecipeLibrary() {
                   <ArrowUpRight size={18} />
                 </div>
                 <p>{r.description}</p>
+                {typeof r.dietaryMetadata === "object" &&
+                  r.dietaryMetadata !== null &&
+                  "isComplete" in r.dietaryMetadata &&
+                  (r.dietaryMetadata as Record<string, unknown>).isComplete === false && (
+                    <div style={{ margin: "4px 0" }}>
+                      <span style={{ fontSize: "11px", fontWeight: 600, color: "#92400e", background: "#fef3c7", padding: "2px 8px", borderRadius: "4px" }}>
+                        Incomplete record · Inspiration only
+                      </span>
+                    </div>
+                  )}
                 <div className="recipe-meta">
                   <span>
                     <Clock3 size={14} />
@@ -382,12 +395,22 @@ export function RecipeLibrary() {
             <Badge>
               {selected.source === "LOCAL"
                 ? "Local recipe"
-                : selected.source === "AI_GENERATED"
-                  ? "AI-generated recipe"
-                  : selected.custom?.preferred
-                    ? "Preferred household version"
-                    : "Retained household version"}
+                : selected.source === "MENDELEY"
+                  ? "Mendeley Indian Dataset"
+                  : selected.source === "AI_GENERATED"
+                    ? "AI-generated recipe"
+                    : selected.custom?.preferred
+                      ? "Preferred household version"
+                      : "Retained household version"}
             </Badge>
+            {typeof selected.dietaryMetadata === "object" &&
+              selected.dietaryMetadata !== null &&
+              "isComplete" in selected.dietaryMetadata &&
+              (selected.dietaryMetadata as Record<string, unknown>).isComplete === false && (
+                <Badge tone="cream">
+                  ⚠️ Incomplete dataset record · Inspiration only
+                </Badge>
+              )}
             <Badge tone="neutral">{selected.defaultServings} servings</Badge>
             <Badge tone="neutral">
               Prep {selected.prepMinutes} min · Cook {selected.cookMinutes} min

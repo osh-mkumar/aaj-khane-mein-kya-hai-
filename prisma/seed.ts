@@ -1,4 +1,4 @@
-﻿import "dotenv/config";
+import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 import { ingredientCatalog, recipes } from "../src/lib/recipes/catalog";
 const db = new PrismaClient();
@@ -156,6 +156,20 @@ async function main() {
   console.log(
     "Seed complete: fictional household, 15 recipes and kitchen inventory.",
   );
+
+  const shouldImportMendeley =
+    process.env.TEST_IMPORT_MENDELEY === "true" ||
+    (!process.env.VITEST && !process.env.DATABASE_URL?.includes("test-"));
+
+  if (shouldImportMendeley) {
+    try {
+      console.log("Importing Mendeley Indian Recipe Dataset into library...");
+      const { importMendeleyRecipes } = await import("../scripts/import-mendeley");
+      await importMendeleyRecipes({ maxImport: 100 });
+    } catch (err) {
+      console.warn("Mendeley dataset import notice:", err);
+    }
+  }
 }
 main()
   .catch((e) => {

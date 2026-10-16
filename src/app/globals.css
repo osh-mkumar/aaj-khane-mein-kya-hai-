@@ -2394,3 +2394,420 @@ a:focus-visible {
   border: 1px solid #bfdbfe;
 }
 
+/* =========================================================
+   ROLE SWITCHER (Family | Cook)
+   ========================================================= */
+.role-switcher-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.role-switcher {
+  display: inline-flex;
+  background: #f1f5f9;
+  padding: 3px;
+  border-radius: 9999px;
+  border: 1px solid #cbd5e1;
+}
+.role-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px;
+  border-radius: 9999px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+  text-decoration: none;
+  transition: all 0.15s ease-in-out;
+}
+.role-toggle-btn:hover {
+  color: #0f172a;
+}
+.role-toggle-btn.active {
+  background: #ffffff;
+  color: #1e293b;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* =========================================================
+   COOK DASHBOARD (Accessible, Touch-Friendly, High-Contrast)
+   ========================================================= */
+.cook-dashboard {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 10px 0 40px;
+}
+.cook-top-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 20px;
+}
+.cook-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 4px 10px;
+  border-radius: 6px;
+  margin-bottom: 8px;
+}
+.cook-main-title {
+  font-size: 28px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 6px;
+}
+.cook-subtext {
+  font-size: 15px;
+  color: #64748b;
+  margin: 0;
+}
+.cook-switch-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.cook-meal-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 18px;
+  overflow-x: auto;
+}
+.cook-tab-btn {
+  padding: 8px 16px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #334155;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.cook-tab-btn.active {
+  background: #2e5927;
+  color: #ffffff;
+  border-color: #2e5927;
+}
+
+/* Hero card for today's dish */
+.cook-hero-card {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 24px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+}
+@media (max-width: 800px) {
+  .cook-hero-card {
+    grid-template-columns: 1fr;
+  }
+}
+.cook-dish-title {
+  font-size: 32px;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 10px 0 12px;
+  line-height: 1.2;
+}
+.cook-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  font-size: 15px;
+  color: #334155;
+  margin-bottom: 12px;
+}
+.cook-meta-row span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.cook-youtube-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #dc2626;
+  font-weight: 600;
+  font-size: 14px;
+  text-decoration: underline;
+}
+.cook-status-pill {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  text-transform: uppercase;
+}
+.cook-status-pill.status-not_started {
+  background: #f1f5f9;
+  color: #475569;
+}
+.cook-status-pill.status-in_progress {
+  background: #dbeafe;
+  color: #1e40af;
+}
+.cook-status-pill.status-completed {
+  background: #dcfce7;
+  color: #166534;
+}
+.split-meal-alert {
+  background: #f8fafc;
+  border-left: 4px solid #3b82f6;
+  padding: 10px 14px;
+  border-radius: 0 8px 8px 0;
+  font-size: 13px;
+  margin-top: 10px;
+}
+
+/* Dietary alerts column */
+.cook-dietary-box {
+  background: #fffbeb;
+  border: 1px solid #fef3c7;
+  border-radius: 10px;
+  padding: 16px;
+}
+.diet-alert-item {
+  font-size: 13px;
+  line-height: 1.4;
+  padding: 8px 10px;
+  border-radius: 6px;
+  margin-bottom: 6px;
+}
+.diet-alert-item.warning {
+  background: #fef3c7;
+  color: #92400e;
+  border-left: 3px solid #d97706;
+}
+.diet-alert-item.danger {
+  background: #fee2e2;
+  color: #991b1b;
+  border-left: 3px solid #dc2626;
+}
+
+/* Layout: Checklist + Steps */
+.cook-columns-layout {
+  display: grid;
+  grid-template-columns: 360px 1fr;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+@media (max-width: 900px) {
+  .cook-columns-layout {
+    grid-template-columns: 1fr;
+  }
+}
+.cook-checklist-card {
+  padding: 20px;
+}
+.cook-ingredients-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 16px 0;
+  max-height: 380px;
+  overflow-y: auto;
+}
+.cook-ingredient-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.cook-ingredient-item:hover {
+  background: #f1f5f9;
+}
+.cook-ingredient-item.checked {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+}
+.cook-ingredient-item.checked .cook-ing-name {
+  text-decoration: line-through;
+  color: #6b7280;
+}
+.cook-checkbox {
+  width: 18px;
+  height: 18px;
+  accent-color: #166534;
+  cursor: pointer;
+}
+.cook-ing-text {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+.cook-ing-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e293b;
+}
+.cook-ing-qty {
+  font-size: 13px;
+  color: #475569;
+}
+.quick-missing-trigger {
+  border-top: 1px solid #f1f5f9;
+  padding-top: 12px;
+}
+
+/* Step-by-step cooking card */
+.cook-steps-card {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+.step-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 20px;
+}
+.step-counter {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  color: #2e5927;
+  display: block;
+  margin-bottom: 4px;
+}
+.tts-lang-picker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.active-step-box {
+  background: #f8fafc;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 28px 24px;
+  margin-bottom: 20px;
+  min-height: 180px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+.large-step-text {
+  font-size: 20px;
+  line-height: 1.6;
+  color: #0f172a;
+  font-weight: 500;
+  margin: 0 0 20px;
+}
+.step-action-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.speech-read-btn {
+  background: #1e293b;
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  padding: 10px 18px;
+  border-radius: 8px;
+}
+.speech-read-btn.speaking {
+  background: #dc2626;
+  animation: pulse 1.5s infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+.step-nav-buttons {
+  display: flex;
+  gap: 8px;
+}
+.cook-progress-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 16px;
+  border-top: 1px solid #e2e8f0;
+}
+.prog-chip {
+  padding: 6px 14px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.prog-chip.active {
+  background: #166534;
+  color: #ffffff;
+  border-color: #166534;
+}
+
+/* Cook Voice Card */
+.cook-voice-card {
+  padding: 24px;
+  background: #ffffff;
+}
+.quick-voice-chips {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+  background: #f8fafc;
+  padding: 10px 14px;
+  border-radius: 8px;
+}
+.quick-phrase-btn {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-size: 12px;
+  color: #1e293b;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.quick-phrase-btn:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+.choice-chip {
+  padding: 6px 12px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.choice-chip.selected {
+  background: #fee2e2;
+  border-color: #f87171;
+  color: #991b1b;
+  font-weight: 600;
+}
+

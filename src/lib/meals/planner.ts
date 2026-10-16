@@ -47,6 +47,20 @@ export function evaluateMenu(
       );
     const diners = selected.filter((m) => selection.memberIds.includes(m.id));
     const verification = verifyRecipe(recipe, diners, request);
+    const meta =
+      typeof recipe.dietaryMetadata === "object" && recipe.dietaryMetadata !== null
+        ? (recipe.dietaryMetadata as Record<string, unknown>)
+        : {};
+    if (meta.isComplete === false) {
+      verification.violations.push({
+        memberId: "all",
+        memberName: "All Diners",
+        ingredientId: "recipe-completeness",
+        rule: "INCOMPLETE_DATASET_RECIPE",
+        message: "This recipe is from an incomplete dataset record and is not verified for cookability.",
+      });
+      verification.status = "REJECTED";
+    }
     return {
       ...selection,
       recipeName: recipe.name,
@@ -184,9 +198,14 @@ export function recommendMenus(request: PlanningRequest, data: PlanningData) {
       message:
         "Requested dish is not in the library. Generate a draft explicitly, or clear the dish to browse local options.",
     };
-  const candidates = preferredRecipes(data.recipes).filter(
-    (r) => fitsCategory(r, request.mealType) || r.id === requested?.id,
-  );
+  const candidates = preferredRecipes(data.recipes).filter((r) => {
+    const meta =
+      typeof r.dietaryMetadata === "object" && r.dietaryMetadata !== null
+        ? (r.dietaryMetadata as Record<string, unknown>)
+        : {};
+    if (meta.isComplete === false) return false;
+    return fitsCategory(r, request.mealType) || r.id === requested?.id;
+  });
   const excluded: { recipeId: string; name: string; reasons: string[] }[] = [];
   const menus: Menu[] = [];
   for (const recipe of candidates) {

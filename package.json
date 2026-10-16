@@ -12,7 +12,8 @@
     "db:generate": "prisma generate",
     "db:migrate": "node scripts/migrate.mjs",
     "db:seed": "tsx prisma/seed.ts",
-    "db:setup": "npm run db:generate && npm run db:migrate && npm run db:seed",
+    "db:import-mendeley": "tsx scripts/import-mendeley.ts",
+    "db:setup": "npm run db:generate && npm run db:migrate && npm run db:seed && npm run db:import-mendeley",
     "format": "prettier --write src prisma/seed.ts tests scripts *.json *.mjs *.mts README.md"
   },
   "dependencies": {

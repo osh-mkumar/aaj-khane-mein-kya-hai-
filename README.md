@@ -124,6 +124,84 @@ npm run build
 
 ---
 
+## 👥 Dual Dashboard Architecture
+
+RasoiOS provides two dedicated operational interfaces sharing the **exact same SQLite database and live state**:
+
+```
++-------------------------------------------------------------+
+|                 Top Navigation: [ Family | Cook ]           |
++------------------------------+------------------------------+
+|       Family Dashboard       |        Cook Dashboard        |
+|           (/family)          |            (/cook)           |
++------------------------------+------------------------------+
+| • Who is eating today?       | • What am I cooking right now?|
+| • Dietary & fasting rules    | • Serving count & time       |
+| • Deterministic meal planner | • Dietary preparation alerts |
+| • Pantry stock & editing     | • Interactive ingredients tap|
+| • Grocery gap aggregator     | • Step-by-step cooking guide |
+| • Household activity history | • Browser TTS (Hindi/En/Mr)  |
+| • Voice Assistant interface  | • Quick voice reporting      |
+|                              | • 1-tap "Ingredient missing" |
+|                              | • Real-time auto-replanning  |
++------------------------------+------------------------------+
+|                     Shared SQLite Database                  |
+|  (Household • Members • Inventory • MealPlans • Activity)   |
++-------------------------------------------------------------+
+```
+
+### 1. Instant Role Switcher
+- Visible toggle in the application header: **Family | Cook**.
+- Zero login, password, OTP, or verification needed.
+- Demo-mode role switcher persisted across browser sessions via `localStorage.getItem("rasoios_active_role")`.
+- Default to **Family Dashboard** for first-time visitors.
+
+### 2. Family Dashboard (`/family`)
+- High-density planning console.
+- Today's breakfast, lunch, and dinner cards.
+- Member management with vegetarian, vegan, Jain, allergy, dislike, and fasting preferences.
+- Phase 2 deterministic constraint solver recommendations with reasons and alternatives.
+- Consolidated grocery shortages and kitchen audit history.
+
+### 3. Cook Dashboard (`/cook`)
+- Task-focused, accessible, touch-friendly interface designed for tablet/mobile kitchen counters:
+  - **"What am I cooking?"**: Active dish title, meal type, number of servings, estimated cooking time.
+  - **Dietary Notices**: Prominent warning banners (e.g. *"Dadi (Sushila) has an active Fast today. Prepare separate dishes without onion, garlic, or grains"*).
+  - **Ingredients Checklist**: Tap-to-check ingredients with required vs. available quantities.
+  - **Step-by-Step Cooking**: High-contrast, one-step-at-a-time instructions with Next/Previous navigation, browser speech synthesis read-aloud (Hindi, English, Marathi), and direct YouTube search links.
+  - **Report Kitchen Changes**: Voice microphone button + manual text input for quick updates (*"Paneer khatam ho gaya"*, *"Palak aadha kilo bacha hai"*).
+  - **Quick Missing Ingredient Action**: One-tap "Report Missing" button with immediate stock invalidation, deterministic meal revalidation, and alternate recipe replacement.
+  - **Cooking Progress**: Track meal status (`NOT_STARTED` -> `IN_PROGRESS` -> `COMPLETED`) with localStorage persistence.
+
+---
+
+## 📚 Mendeley Indian Recipe Dataset Integration
+
+RasoiOS integrates the real-world **Mendeley Indian Recipe Dataset** from Archana's Kitchen to power its regional Indian recipe library alongside manually curated household dishes.
+
+- **Source**: [Mendeley Data xsphgmmh7b.1](https://data.mendeley.com/datasets/xsphgmmh7b/1/files/6fb5ae32-a815-4b8f-9d68-8d512227eac8)
+- **Author**: Kanishka Jain
+- **License**: Creative Commons Attribution 4.0 International (CC BY 4.0)
+- **File Name**: `IndianFoodDatasetCSV.csv` (24.15 MB, 6,871 recipe records)
+- **Discovered Columns (15)**:
+  `Srno`, `RecipeName`, `TranslatedRecipeName`, `Ingredients`, `TranslatedIngredients`, `PrepTimeInMins`, `CookTimeInMins`, `TotalTimeInMins`, `Servings`, `Cuisine`, `Course`, `Diet`, `Instructions`, `TranslatedInstructions`, `URL`.
+
+### Ingestion & Normalization Rules
+1. **Multiline Quoted CSV Parser**: Custom state-machine parser handling commas, quotes, and multiline text inside recipe descriptions.
+2. **Deterministic Quantity & Unit Parsing**: Parses compound fractions (`2-1/2` -> `2.5`, `1/2` -> `0.5`, `3/4` -> `0.75`), decimal numbers, and converts raw text units into canonical RasoiOS units (`tbsp`, `tsp`, `cup`, `g`, `kg`, `clove`, `pinch`).
+3. **No Hallucinated Quantities**: Recipes without explicit ingredient quantities preserve original text but mark quantities as `UNKNOWN` rather than inventing quantities.
+4. **Solver Protection Rule**: Recipes marked incomplete (`isComplete: false` or missing critical cooking metadata) are flagged as **"Inspiration Only"** in the recipe catalog and are **strictly excluded** from deterministic feasibility calculation and meal planning solver candidates.
+5. **Attribution**: Every imported recipe carries dataset attribution in `dietaryMetadata.attribution`.
+6. **Curated Recipe Preservation**: Existing 15 local curated recipes (`source: "LOCAL"`) remain untouched.
+
+### Running Dataset Ingestion
+To run the reproducible importer:
+```powershell
+npm run db:import-mendeley
+```
+
+---
+
 ## 📡 API Endpoints
 
 | Endpoint | Method | Description |
@@ -145,4 +223,6 @@ npm run build
 - **Human-in-the-Loop Confirmation**: No inventory or member state changes occur without explicit user review.
 - **Idempotent Mutations**: Batches use an `idempotencyKey` preventing double submissions or race conditions.
 - **Zero Hallucinated Recipes**: Recommendations are strictly resolved from verified household recipe templates and real pantry stock.
+- **Incomplete Dataset Protection**: Incomplete recipes are strictly flagged and barred from meal solver candidates.
 - **No Leaked Secrets**: All API keys remain server-side.
+

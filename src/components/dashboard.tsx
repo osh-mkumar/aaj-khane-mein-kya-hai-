@@ -15,6 +15,8 @@ import {
   CalendarDays,
   Mic,
   ShoppingBag,
+  CookingPot,
+  AlertTriangle,
 } from "lucide-react";
 import type { Household, Recipe } from "@/types";
 import { api, Badge, Loading, ErrorBox, formatDate } from "./ui/shared";
@@ -36,28 +38,69 @@ export function Dashboard() {
   const soon = data.inventory.filter(
     (i) => i.availability !== "UNAVAILABLE" && expiryState(i.expiryDate),
   );
+  const unavailableItems = data.inventory.filter(
+    (i) => i.availability === "UNAVAILABLE"
+  );
+  const fastingMembers = data.members.filter((m) => m.fasting);
+
   return (
     <>
       <div className="page-heading">
         <div>
-          <div className="eyebrow">A LITTLE PLANNING. A LOT MORE PEACE.</div>
+          <div className="eyebrow">FAMILY DASHBOARD · YOUR KITCHEN OVERVIEW</div>
           <h1>
             Welcome to your kitchen<span className="title-dot">.</span>
           </h1>
           <p>Everyone’s preferences. Every ingredient. All in one place.</p>
         </div>
         <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+          <Link
+            className="button primary"
+            href="/cook"
+            onClick={() => {
+              try {
+                localStorage.setItem("rasoios_active_role", "cook");
+              } catch {}
+            }}
+          >
+            <CookingPot size={17} /> Open Cook Dashboard
+          </Link>
           <Link className="button secondary" href="/voice">
             <Mic size={17} /> Voice Assistant
           </Link>
           <Link className="button secondary" href="/groceries">
             <ShoppingBag size={17} /> Grocery Gaps
           </Link>
-          <Link className="button primary" href="/inventory">
+          <Link className="button secondary" href="/inventory">
             <Plus size={17} /> Update inventory
           </Link>
         </div>
       </div>
+
+      {/* Fasting & Low-Stock Notices */}
+      {fastingMembers.length > 0 && (
+        <div className="notice-box warning" style={{ margin: "1rem 0" }}>
+          <AlertTriangle size={18} />
+          <span>
+            <strong>Fasting Status Active:</strong>{" "}
+            {fastingMembers.map((m) => m.name).join(", ")} has fasting today. Meal planner and recommendations will enforce fasting restrictions.
+          </span>
+        </div>
+      )}
+
+      {unavailableItems.length > 0 && (
+        <div className="notice-box error" style={{ margin: "0.5rem 0 1rem" }}>
+          <AlertTriangle size={18} />
+          <span>
+            <strong>Pantry Shortfall Alert ({unavailableItems.length}):</strong>{" "}
+            {unavailableItems.slice(0, 4).map((i) => i.ingredient?.name || i.ingredientId).join(", ")}
+            {unavailableItems.length > 4 ? ` and ${unavailableItems.length - 4} more` : ""} marked unavailable.{" "}
+            <Link href="/groceries" style={{ textDecoration: "underline", fontWeight: 600 }}>
+              Review Grocery Gaps →
+            </Link>
+          </span>
+        </div>
+      )}
       <section className="hero">
         <div className="hero-copy">
           <Badge tone="cream">

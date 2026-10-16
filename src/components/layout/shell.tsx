@@ -17,7 +17,8 @@ import {
   ShoppingBag,
 } from "lucide-react";
 const links = [
-  ["/dashboard", "Dashboard", LayoutDashboard],
+  ["/family", "Family Dashboard", LayoutDashboard],
+  ["/cook", "Cook Dashboard", CookingPot],
   ["/voice", "Voice Assistant", Mic],
   ["/household", "Household", Users],
   ["/inventory", "Kitchen Inventory", Package],
@@ -28,6 +29,7 @@ const links = [
 ] as const;
 export function Shell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
+  const isCook = path === "/cook";
   const [name, setName] = useState("Your household");
   useEffect(() => {
     api<{ name: string }>("household")
@@ -37,7 +39,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
   return (
     <div className="app">
       <aside className="sidebar">
-        <Link href="/dashboard" className="brand">
+        <Link href={isCook ? "/cook" : "/family"} className="brand">
           <span className="brand-icon">
             <CookingPot size={27} />
           </span>
@@ -48,16 +50,30 @@ export function Shell({ children }: { children: React.ReactNode }) {
         </Link>
         <div className="nav-caption">YOUR KITCHEN, TOGETHER</div>
         <nav>
-          {links.map(([href, label, Icon]) => (
-            <Link
-              key={href}
-              href={href}
-              className={path === href ? "nav-link active" : "nav-link"}
-            >
-              <Icon size={19} />
-              <span>{label}</span>
-            </Link>
-          ))}
+          {links.map(([href, label, Icon]) => {
+            const isActive =
+              path === href ||
+              (href === "/family" && path === "/dashboard");
+            return (
+              <Link
+                key={href}
+                href={href}
+                onClick={() => {
+                  try {
+                    if (href === "/cook") {
+                      localStorage.setItem("rasoios_active_role", "cook");
+                    } else if (href === "/family") {
+                      localStorage.setItem("rasoios_active_role", "family");
+                    }
+                  } catch {}
+                }}
+                className={isActive ? "nav-link active" : "nav-link"}
+              >
+                <Icon size={19} />
+                <span>{label}</span>
+              </Link>
+            );
+          })}
         </nav>
         <div className="sidebar-note">
           <Leaf size={24} />
@@ -71,17 +87,48 @@ export function Shell({ children }: { children: React.ReactNode }) {
           <div className="avatar">{name.slice(0, 1)}</div>
           <div>
             <strong>{name}</strong>
-            <small>Single-household demo</small>
+            <small>{isCook ? "Cook Mode Active" : "Family Mode Active"}</small>
           </div>
         </div>
       </aside>
       <div className="workspace">
         <header className="topbar">
-          <span>
-            <span className="status-dot" /> Your kitchen, in sync
-          </span>
+          <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+            <span>
+              <span className="status-dot" /> Your kitchen, in sync
+            </span>
+          </div>
+
+          {/* Role selection switch: Family | Cook */}
+          <div className="role-switcher-container">
+            <div className="role-switcher" role="radiogroup" aria-label="Dashboard Role">
+              <Link
+                href="/family"
+                onClick={() => {
+                  try {
+                    localStorage.setItem("rasoios_active_role", "family");
+                  } catch {}
+                }}
+                className={`role-toggle-btn ${!isCook ? "active" : ""}`}
+              >
+                <Users size={14} /> Family
+              </Link>
+              <Link
+                href="/cook"
+                onClick={() => {
+                  try {
+                    localStorage.setItem("rasoios_active_role", "cook");
+                  } catch {}
+                }}
+                className={`role-toggle-btn ${isCook ? "active" : ""}`}
+              >
+                <CookingPot size={14} /> Cook
+              </Link>
+            </div>
+          </div>
+
           <span className="demo-label">
-            PHASE 02 <span>·</span> LOCAL DEMO
+            {isCook ? "COOK VIEW" : "FAMILY VIEW"} <span>·</span> LOCAL DEMO
           </span>
         </header>
         <main>{children}</main>
