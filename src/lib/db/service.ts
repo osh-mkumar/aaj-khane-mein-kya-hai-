@@ -9,6 +9,7 @@ import {
   recipeSchema,
 } from "../validation";
 import { convertQuantity } from "../inventory/units";
+import { normalizeIngredient } from "../recipes/aliases";
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -22,11 +23,17 @@ export const recipeInclude = {
   ingredients: { include: { ingredient: true } },
   instructions: { orderBy: { position: "asc" as const } },
   custom: true,
+  generation: true,
 } as const;
-const recipeScope = {
-  OR: [{ source: "LOCAL" }, { custom: { householdId: HOUSEHOLD_ID } }],
+export const recipeScope = {
+  OR: [
+    { source: "LOCAL" },
+    { source: "MENDELEY" },
+    { custom: { householdId: HOUSEHOLD_ID } },
+    { generation: { householdId: HOUSEHOLD_ID } },
+  ],
 };
-async function log(
+export async function log(
   tx: Prisma.TransactionClient,
   type: string,
   entityId: string,
@@ -84,6 +91,15 @@ export async function saveMember(input: unknown, id?: string) {
     if (id && !old) throw new ApiError(404, "Member not found");
     const { excludedIngredients, excludedCategories, fastingRule, ...fields } =
       parsed;
+    if (
+      fastingRule?.startsOn &&
+      fastingRule.endsOn &&
+      fastingRule.endsOn < fastingRule.startsOn
+    )
+      throw new ApiError(
+        422,
+        "Fasting end date must not precede its start date",
+      );
     const active = fields.active ?? old?.active ?? true;
     const data = { ...fields, ...(!active ? { participating: false } : {}) };
     const m = old
@@ -200,7 +216,7 @@ export async function saveInventory(input: unknown, id?: string) {
       merged.expiryDate < merged.purchaseDate
     )
       throw new ApiError(422, "Use-by date must be on or after purchase date");
-    const ingredientId = canonical(merged.ingredientName);
+    const ingredientId = normalizeIngredient(merged.ingredientName);
     if (!ingredientId)
       throw new ApiError(
         422,
@@ -325,10 +341,13 @@ export async function saveRecipe(input: unknown, id?: string) {
     const original = await tx.recipe.findFirst({
       where: {
         id: custom?.originalRecipeId ?? v.originalRecipeId ?? "",
-        source: "LOCAL",
+        OR: [
+          { source: "LOCAL" },
+          { generation: { householdId: HOUSEHOLD_ID } },
+        ],
       },
     });
-    if (!original) throw new ApiError(404, "Original local recipe not found");
+    if (!original) throw new ApiError(404, "Original recipe not found");
     const count = await tx.ingredient.count({
       where: { id: { in: v.ingredients.map((i) => i.ingredientId) } },
     });
@@ -354,7 +373,7 @@ export async function saveRecipe(input: unknown, id?: string) {
       });
       await tx.householdRecipeOverride.update({
         where: { id: custom.id },
-        data: { updatedAt: new Date() },
+        data: { updatedAt: new Date(), preferred: true },
       });
     } else {
       result = await tx.recipe.create({

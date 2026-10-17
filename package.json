@@ -8,19 +8,25 @@
     "start": "next start --hostname 127.0.0.1",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:http": "node scripts/http-smoke.mjs",
     "db:generate": "prisma generate",
     "db:migrate": "node scripts/migrate.mjs",
     "db:seed": "tsx prisma/seed.ts",
-    "db:setup": "npm run db:generate && npm run db:migrate && npm run db:seed",
+    "db:import-mendeley": "tsx scripts/import-mendeley.ts",
+    "db:setup": "npm run db:generate && npm run db:migrate && npm run db:seed && npm run db:import-mendeley",
     "format": "prettier --write src prisma/seed.ts tests scripts *.json *.mjs *.mts README.md"
   },
   "dependencies": {
+    "@google/genai": "^2.30.0",
     "@prisma/client": "6.19.0",
+    "decimal.js": "10.6.0",
+    "groq-sdk": "^1.6.0",
     "lucide-react": "0.468.0",
     "next": "16.4.2",
+    "openai": "7.34.0",
     "react": "19.2.7",
     "react-dom": "19.2.7",
-    "zod": "3.24.2"
+    "zod": "3.25.76"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "4.1.18",

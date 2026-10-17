@@ -17,6 +17,7 @@ model Household {
   plans MealPlan[]
   events InventoryEvent[]
   activity ActivityLog[]
+  generations RecipeGenerationRecord[]
 }
 model HouseholdMember {
   id String @id @default(cuid())
@@ -31,6 +32,7 @@ model HouseholdMember {
   active Boolean @default(true)
   participating Boolean @default(true)
   fasting Boolean @default(false)
+  allowEggs Boolean @default(false)
   dietaryRules DietaryRule[]
   fastingRule FastingRule?
   participations MealParticipant[]
@@ -54,6 +56,9 @@ model FastingRule {
   permittedCategories Json
   prohibitedCategories Json
   notes String @default("")
+  startsOn String?
+  endsOn String?
+  mealType String?
 }
 model Ingredient {
   id String @id
@@ -96,6 +101,8 @@ model Recipe {
   originals HouseholdRecipeOverride[] @relation("Original")
   custom HouseholdRecipeOverride? @relation("Custom")
   plans MealPlan[]
+  dishes MealPlanDish[]
+  generation RecipeGenerationRecord?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -140,6 +147,36 @@ model MealPlan {
   status String @default("DRAFT")
   stateVersion Int
   participants MealParticipant[]
+  mealType String @default("dinner")
+  servings Int @default(1)
+  maxMinutes Int @default(60)
+  snapshot Json?
+  createdAt DateTime @default(now())
+  dishes MealPlanDish[]
+}
+model MealPlanDish {
+  id String @id @default(cuid())
+  mealPlanId String
+  mealPlan MealPlan @relation(fields: [mealPlanId], references: [id], onDelete: Cascade)
+  recipeId String?
+  recipe Recipe? @relation(fields: [recipeId], references: [id], onDelete: SetNull)
+  servings Int
+  memberIds Json
+  recipeSnapshot Json
+}
+model RecipeGenerationRecord {
+  id String @id @default(cuid())
+  householdId String
+  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  recipeId String @unique
+  recipe Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  requestKey String
+  requestedDish String
+  model String
+  generatedAt DateTime
+  savedAt DateTime @default(now())
+  warnings Json
+  @@unique([householdId, requestKey])
 }
 model MealParticipant {
   id String @id @default(cuid())

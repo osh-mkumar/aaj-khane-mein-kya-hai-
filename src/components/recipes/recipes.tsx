@@ -1,4 +1,5 @@
 "use client";
+import { RecipeAnalysis } from "./RecipeAnalysis";
 import { useEffect, useState } from "react";
 import {
   Search,
@@ -10,7 +11,10 @@ import {
   Plus,
   Trash2,
   ChefHat,
+  PlayCircle,
 } from "lucide-react";
+import { CookMode } from "./CookMode";
+import { RecipeSearchAutocomplete } from "./RecipeSearchAutocomplete";
 import type { Recipe, Ingredient } from "@/types";
 import { units } from "@/lib/validation";
 import {
@@ -243,10 +247,12 @@ export function RecipeLibrary() {
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [selected, setSelected] = useState<Recipe>();
   const [editing, setEditing] = useState<Recipe>();
+  const [cookingRecipe, setCookingRecipe] = useState<Recipe | null>(null);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [resetting, setResetting] = useState(false);
   async function load() {
     const [r, i] = await Promise.all([
       api<Recipe[]>("recipes"),
@@ -300,6 +306,7 @@ export function RecipeLibrary() {
             ["all", "All recipes"],
             ["LOCAL", "Local favourites"],
             ["HOUSEHOLD_CUSTOM", "Our family’s versions"],
+            ["AI_GENERATED", "AI recipes"],
           ].map(([v, label]) => (
             <button
               key={v}
@@ -310,15 +317,18 @@ export function RecipeLibrary() {
             </button>
           ))}
         </div>
-        <div className="search">
-          <Search size={18} />
-          <input
-            aria-label="Search recipes"
-            placeholder="Find a favourite…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-        </div>
+        <RecipeSearchAutocomplete
+          value={query}
+          onChange={setQuery}
+          onSelect={(recipe) => {
+            if (filter !== "all" && recipe.source !== filter) {
+              setFilter("all");
+            }
+            setSelected(recipe);
+          }}
+          recipes={recipes}
+          placeholder="Find a favourite…"
+        />
       </div>
       {!recipes ? (
         <Loading />
@@ -344,6 +354,9 @@ export function RecipeLibrary() {
                 {r.source === "HOUSEHOLD_CUSTOM" && (
                   <span className="custom-ribbon">OUR WAY</span>
                 )}
+                {r.source === "MENDELEY" && (
+                  <span className="custom-ribbon" style={{ background: "#0369a1" }}>MENDELEY</span>
+                )}
               </div>
               <div className="recipe-body">
                 <div className="recipe-title">
@@ -351,6 +364,16 @@ export function RecipeLibrary() {
                   <ArrowUpRight size={18} />
                 </div>
                 <p>{r.description}</p>
+                {typeof r.dietaryMetadata === "object" &&
+                  r.dietaryMetadata !== null &&
+                  "isComplete" in r.dietaryMetadata &&
+                  (r.dietaryMetadata as Record<string, unknown>).isComplete === false && (
+                    <div style={{ margin: "4px 0" }}>
+                      <span style={{ fontSize: "11px", fontWeight: 600, color: "#92400e", background: "#fef3c7", padding: "2px 8px", borderRadius: "4px" }}>
+                        Incomplete record · Inspiration only
+                      </span>
+                    </div>
+                  )}
                 <div className="recipe-meta">
                   <span>
                     <Clock3 size={14} />
@@ -376,8 +399,22 @@ export function RecipeLibrary() {
             <Badge>
               {selected.source === "LOCAL"
                 ? "Local recipe"
-                : "Preferred household version"}
+                : selected.source === "MENDELEY"
+                  ? "Mendeley Indian Dataset"
+                  : selected.source === "AI_GENERATED"
+                    ? "AI-generated recipe"
+                    : selected.custom?.preferred
+                      ? "Preferred household version"
+                      : "Retained household version"}
             </Badge>
+            {typeof selected.dietaryMetadata === "object" &&
+              selected.dietaryMetadata !== null &&
+              "isComplete" in selected.dietaryMetadata &&
+              (selected.dietaryMetadata as Record<string, unknown>).isComplete === false && (
+                <Badge tone="cream">
+                  ⚠️ Incomplete dataset record · Inspiration only
+                </Badge>
+              )}
             <Badge tone="neutral">{selected.defaultServings} servings</Badge>
             <Badge tone="neutral">
               Prep {selected.prepMinutes} min · Cook {selected.cookMinutes} min
@@ -425,12 +462,65 @@ export function RecipeLibrary() {
               Optional swaps: {asList(selected.substitutions).join(" ")}
             </p>
           )}
+          <RecipeAnalysis
+            key={selected.id + selected.updatedAt}
+            recipeId={selected.id}
+            baseServings={selected.defaultServings}
+          />
+          {selected.custom && (
+            <div className="card-actions">
+              <button
+                onClick={() => {
+                  const original = recipes?.find(
+                    (r) => r.id === selected.custom?.originalRecipeId,
+                  );
+                  if (original) setSelected(original);
+                }}
+              >
+                View original recipe
+              </button>
+              <button
+                disabled={resetting}
+                onClick={async () => {
+                  setResetting(true);
+                  try {
+                    const original = await api<Recipe>(
+                      `recipes/reset/${selected.id}`,
+                      "POST",
+                      { confirmed: true },
+                    );
+                    await load();
+                    setSelected(original);
+                    setNotice(
+                      "Original restored as preferred. Your household copy is retained.",
+                    );
+                  } catch (e) {
+                    setError((e as Error).message);
+                  } finally {
+                    setResetting(false);
+                  }
+                }}
+              >
+                Use original by default
+              </button>
+            </div>
+          )}
           <div className="modal-actions">
             <button
               className="button secondary"
               onClick={() => setSelected(undefined)}
             >
               Close
+            </button>
+            <button
+              className="button secondary"
+              style={{ display: "inline-flex", gap: "6px", alignItems: "center" }}
+              onClick={() => {
+                setCookingRecipe(selected);
+                setSelected(undefined);
+              }}
+            >
+              <PlayCircle size={16} /> Cook Mode
             </button>
             <button
               className="button primary"
@@ -451,6 +541,17 @@ export function RecipeLibrary() {
                   : "Make a household copy"}
             </button>
           </div>
+        </Modal>
+      )}
+      {cookingRecipe && (
+        <Modal
+          title={`Cooking Assistant: ${cookingRecipe.name}`}
+          onClose={() => setCookingRecipe(null)}
+        >
+          <CookMode
+            recipe={cookingRecipe}
+            onClose={() => setCookingRecipe(null)}
+          />
         </Modal>
       )}
       {editing && (

@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import type { Member } from "@/types";
 import { diets, MemberInput } from "@/lib/validation";
+import { mealTypes } from "@/lib/validation/planning";
 import {
   api,
   Modal,
@@ -53,6 +54,7 @@ function memberForm(m: Member): MemberInput {
     active: m.active,
     participating: m.participating,
     fasting: m.fasting,
+    allowEggs: m.allowEggs,
     excludedIngredients: m.dietaryRules
       .filter((r) => r.target === "INGREDIENT")
       .map((r) => r.value),
@@ -66,6 +68,10 @@ function memberForm(m: Member): MemberInput {
           permittedCategories: asList(m.fastingRule.permittedCategories),
           prohibitedCategories: asList(m.fastingRule.prohibitedCategories),
           notes: m.fastingRule.notes,
+          startsOn: m.fastingRule.startsOn,
+          endsOn: m.fastingRule.endsOn,
+          mealType: m.fastingRule
+            .mealType as MemberInput["fastingRule"]["mealType"],
         }
       : empty.fastingRule,
   };
@@ -198,6 +204,15 @@ function MemberEditor({
               />
             </Field>
           ))}
+          <label className="check wide">
+            <input
+              type="checkbox"
+              checked={form.allowEggs ?? false}
+              onChange={(e) => set("allowEggs", e.target.checked)}
+            />{" "}
+            Allow eggs for a Vegetarian profile (explicit exclusions and
+            allergies still apply)
+          </label>
           <label className="check">
             <input
               type="checkbox"
@@ -257,6 +272,54 @@ function MemberEditor({
               />
             </Field>
           ))}
+          <div className="info-strip wide">
+            A nonempty permitted list is a whitelist: every ingredient must
+            match a permitted ingredient or category. Prohibitions and allergies
+            always override permission. Include water, salt and cooking fat if
+            permitted.
+          </div>
+          <Field label="Fasting start date (optional)">
+            <input
+              type="date"
+              value={form.fastingRule.startsOn ?? ""}
+              onChange={(e) =>
+                set("fastingRule", {
+                  ...form.fastingRule,
+                  startsOn: e.target.value || null,
+                })
+              }
+            />
+          </Field>
+          <Field label="Fasting end date (optional)">
+            <input
+              type="date"
+              value={form.fastingRule.endsOn ?? ""}
+              onChange={(e) =>
+                set("fastingRule", {
+                  ...form.fastingRule,
+                  endsOn: e.target.value || null,
+                })
+              }
+            />
+          </Field>
+          <Field label="Fasting meal (optional)">
+            <select
+              value={form.fastingRule.mealType ?? ""}
+              onChange={(e) =>
+                set("fastingRule", {
+                  ...form.fastingRule,
+                  mealType:
+                    (e.target
+                      .value as MemberInput["fastingRule"]["mealType"]) || null,
+                })
+              }
+            >
+              <option value="">All meals</option>
+              {mealTypes.map((t) => (
+                <option key={t}>{t}</option>
+              ))}
+            </select>
+          </Field>
           <Field label="Fasting notes" wide>
             <textarea
               value={form.fastingRule.notes}

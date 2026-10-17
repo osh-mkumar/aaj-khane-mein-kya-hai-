@@ -1,4 +1,5 @@
-const measures: Record<string, { dimension: string; factor: number }> = {
+import Decimal from "decimal.js";
+export const measures: Record<string, { dimension: string; factor: number }> = {
   g: { dimension: "mass", factor: 1 },
   kg: { dimension: "mass", factor: 1000 },
   ml: { dimension: "volume", factor: 1 },
@@ -23,10 +24,13 @@ export function convertQuantity(
     );
   return quantity === null
     ? null
-    : Math.round(
-        ((quantity * measures[from].factor) / measures[to].factor) * 1000000,
-      ) / 1000000;
+    : new Decimal(quantity)
+        .mul(measures[from].factor)
+        .div(measures[to].factor)
+        .toNumber();
 }
+export const displayQuantity = (value: number | null) =>
+  value === null ? "Unknown" : new Decimal(value).toDecimalPlaces(2).toString();
 export function expiryState(date: string | Date | null, now = new Date()) {
   if (!date) return null;
   // Use-by values are calendar dates, not elapsed 24-hour intervals.

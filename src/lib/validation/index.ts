@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { dateOnly, mealTypes } from "./planning";
 export const diets = [
   "Vegetarian",
   "Non-vegetarian",
@@ -29,6 +30,9 @@ export const fastingSchema = z
     permittedCategories: list,
     prohibitedCategories: list,
     notes: z.string().max(2000),
+    startsOn: dateOnly.nullable().optional(),
+    endsOn: dateOnly.nullable().optional(),
+    mealType: z.enum(mealTypes).nullable().optional(),
   })
   .strict();
 export const memberSchema = z
@@ -42,6 +46,7 @@ export const memberSchema = z
     active: z.boolean(),
     participating: z.boolean(),
     fasting: z.boolean(),
+    allowEggs: z.boolean().optional(),
     excludedIngredients: list,
     excludedCategories: list,
     fastingRule: fastingSchema,
