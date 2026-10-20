@@ -235,6 +235,14 @@ npm run build
 5. **Incomplete Dataset Protection**: Incomplete recipes are strictly flagged and cannot be marked feasible by the solver.
 
 ---
+## Screenshots
+<img width="1918" height="789" alt="Screenshot 2026-10-16 160941" src="https://github.com/user-attachments/assets/fc030228-75e3-48e9-a144-739195c0164e" />
+<img width="1917" height="789" alt="Screenshot 2026-10-16 161002" src="https://github.com/user-attachments/assets/0102df19-4c13-49e2-9494-5be5f47a60a2" />
+<img width="1918" height="789" alt="Screenshot 2026-10-16 160926" src="https://github.com/user-attachments/assets/14a90444-63a2-4de1-a29e-ba4bd85f4efc" />
+<img width="1918" height="784" alt="Screenshot 2026-10-16 161106" src="https://github.com/user-attachments/assets/5c6d9ed2-f3a4-4604-831d-f1be4c0e593c" />
+<img width="1918" height="790" alt="Screenshot 2026-10-16 161021" src="https://github.com/user-attachments/assets/0c2fc0e4-267a-44b4-87e7-092caebae59b" />
+<img width="1918" height="787" alt="Screenshot 2026-10-16 160855" src="https://github.com/user-attachments/assets/d9f57fb4-887f-4482-b32a-8756f7ce9250" />
+
 
 ## 📄 License & Attribution
 
